@@ -1,0 +1,620 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import json
+from datetime import datetime
+import re
+
+class WeatherDiary:
+    """Приложение для ведения дневника погоды"""
+    
+    def __init__(self):
+        # Загрузка записей из файла
+        self.records = self.load_records()
+        
+        # Создание главного окна
+        self.window = tk.Tk()
+        self.window.title("🌤️ Weather Diary")
+        self.window.geometry("1000x650")
+        self.window.resizable(False, False)
+        self.window.configure(bg="#1a1a2e")
+        
+        # Центрирование окна
+        self.center_window()
+        
+        # Создание интерфейса
+        self.create_widgets()
+        
+        # Обновление таблицы
+        self.update_table()
+        
+        # Обработка закрытия окна
+        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+    
+    def center_window(self):
+        """Центрирует окно на экране"""
+        self.window.update_idletasks()
+        width = 1000
+        height = 650
+        x = (self.window.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.window.winfo_screenheight() // 2) - (height // 2)
+        self.window.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def load_records(self):
+        """Загружает записи из JSON-файла"""
+        try:
+            with open("weather.json", "r", encoding="utf-8") as file:
+                records = json.load(file)
+                if isinstance(records, list):
+                    return records
+                return []
+        except FileNotFoundError:
+            return []
+        except json.JSONDecodeError:
+            messagebox.showerror("Ошибка", "Файл weather.json повреждён")
+            return []
+    
+    def save_records(self):
+        """Сохраняет записи в JSON-файл"""
+        try:
+            with open("weather.json", "w", encoding="utf-8") as file:
+                json.dump(self.records, file, ensure_ascii=False, indent=4)
+            return True
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось сохранить: {e}")
+            return False
+    
+    def create_widgets(self):
+        """Создаёт все виджеты интерфейса"""
+        
+        # Заголовок
+        title_frame = tk.Frame(self.window, bg="#1a1a2e")
+        title_frame.pack(fill="x", pady=(15, 10), padx=20)
+        
+        title_label = tk.Label(
+            title_frame,
+            text="🌤️ Weather Diary",
+            font=("Segoe UI", 20, "bold"),
+            bg="#1a1a2e",
+            fg="#ffffff"
+        )
+        title_label.pack()
+        
+        subtitle_label = tk.Label(
+            title_frame,
+            text="Дневник наблюдений за погодой",
+            font=("Segoe UI", 10),
+            bg="#1a1a2e",
+            fg="#888888"
+        )
+        subtitle_label.pack()
+        
+        # Основной фрейм
+        main_frame = tk.Frame(self.window, bg="#1a1a2e")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Левая панель - форма добавления
+        left_frame = tk.Frame(main_frame, bg="#16213e", relief="groove", bd=1)
+        left_frame.pack(side="left", fill="both", padx=(0, 10), ipadx=10, ipady=10)
+        
+        tk.Label(
+            left_frame,
+            text="✏️ ДОБАВИТЬ ЗАПИСЬ",
+            font=("Segoe UI", 14, "bold"),
+            bg="#16213e",
+            fg="#ffffff"
+        ).pack(pady=(10, 15))
+        
+        # Поле даты
+        tk.Label(
+            left_frame,
+            text="📅 Дата (ГГГГ-ММ-ДД):",
+            font=("Segoe UI", 11),
+            bg="#16213e",
+            fg="#cccccc"
+        ).pack(anchor="w", pady=(0, 5))
+        
+        self.date_entry = tk.Entry(
+            left_frame,
+            font=("Segoe UI", 11),
+            bg="#0f3460",
+            fg="#ffffff",
+            relief="flat",
+            width=25
+        )
+        self.date_entry.pack(fill="x", pady=(0, 15))
+        self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        
+        # Поле температуры
+        tk.Label(
+            left_frame,
+            text="🌡️ Температура (°C):",
+            font=("Segoe UI", 11),
+            bg="#16213e",
+            fg="#cccccc"
+        ).pack(anchor="w", pady=(0, 5))
+        
+        self.temp_entry = tk.Entry(
+            left_frame,
+            font=("Segoe UI", 11),
+            bg="#0f3460",
+            fg="#ffffff",
+            relief="flat",
+            width=25
+        )
+        self.temp_entry.pack(fill="x", pady=(0, 15))
+        
+        # Поле описания
+        tk.Label(
+            left_frame,
+            text="📝 Описание погоды:",
+            font=("Segoe UI", 11),
+            bg="#16213e",
+            fg="#cccccc"
+        ).pack(anchor="w", pady=(0, 5))
+        
+        self.desc_entry = tk.Entry(
+            left_frame,
+            font=("Segoe UI", 11),
+            bg="#0f3460",
+            fg="#ffffff",
+            relief="flat",
+            width=25
+        )
+        self.desc_entry.pack(fill="x", pady=(0, 15))
+        
+        # Осадки
+        tk.Label(
+            left_frame,
+            text="☔ Осадки:",
+            font=("Segoe UI", 11),
+            bg="#16213e",
+            fg="#cccccc"
+        ).pack(anchor="w", pady=(0, 5))
+        
+        self.precipitation_var = tk.BooleanVar()
+        self.precipitation_check = tk.Checkbutton(
+            left_frame,
+            text="Есть осадки",
+            variable=self.precipitation_var,
+            bg="#16213e",
+            fg="#ffffff",
+            selectcolor="#16213e",
+            font=("Segoe UI", 10)
+        )
+        self.precipitation_check.pack(anchor="w", pady=(0, 20))
+        
+        # Кнопка добавления
+        self.add_button = tk.Button(
+            left_frame,
+            text="➕ ДОБАВИТЬ ЗАПИСЬ",
+            command=self.add_record,
+            bg="#e94560",
+            fg="white",
+            font=("Segoe UI", 11, "bold"),
+            relief="flat",
+            cursor="hand2",
+            pady=8
+        )
+        self.add_button.pack(fill="x", pady=(5, 10))
+        
+        self.add_button.bind("<Enter>", lambda e: self.add_button.config(bg="#ff6b6b"))
+        self.add_button.bind("<Leave>", lambda e: self.add_button.config(bg="#e94560"))
+        
+        # Статистика
+        stats_frame = tk.Frame(left_frame, bg="#0f3460", relief="flat")
+        stats_frame.pack(fill="x", pady=(15, 0), ipady=10)
+        
+        tk.Label(
+            stats_frame,
+            text="📊 СТАТИСТИКА",
+            font=("Segoe UI", 12, "bold"),
+            bg="#0f3460",
+            fg="#ffffff"
+        ).pack(pady=(5, 10))
+        
+        self.total_label = tk.Label(
+            stats_frame,
+            text="Всего записей: 0",
+            font=("Segoe UI", 10),
+            bg="#0f3460",
+            fg="#4ecdc4"
+        )
+        self.total_label.pack()
+        
+        self.avg_temp_label = tk.Label(
+            stats_frame,
+            text="Средняя температура: 0°C",
+            font=("Segoe UI", 10),
+            bg="#0f3460",
+            fg="#4ecdc4"
+        )
+        self.avg_temp_label.pack()
+        
+        self.max_temp_label = tk.Label(
+            stats_frame,
+            text="Максимальная температура: 0°C",
+            font=("Segoe UI", 10),
+            bg="#0f3460",
+            fg="#4ecdc4"
+        )
+        self.max_temp_label.pack()
+        
+        self.min_temp_label = tk.Label(
+            stats_frame,
+            text="Минимальная температура: 0°C",
+            font=("Segoe UI", 10),
+            bg="#0f3460",
+            fg="#4ecdc4"
+        )
+        self.min_temp_label.pack()
+        
+        # Правая панель - таблица и фильтры
+        right_frame = tk.Frame(main_frame, bg="#1a1a2e")
+        right_frame.pack(side="right", fill="both", expand=True)
+        
+        # Панель фильтрации
+        filter_frame = tk.Frame(right_frame, bg="#16213e", relief="groove", bd=1)
+        filter_frame.pack(fill="x", pady=(0, 10), ipady=10, ipadx=10)
+        
+        tk.Label(
+            filter_frame,
+            text="🔍 ФИЛЬТРАЦИЯ",
+            font=("Segoe UI", 12, "bold"),
+            bg="#16213e",
+            fg="#ffffff"
+        ).pack(pady=(5, 10))
+        
+        # Фильтр по дате
+        date_filter_frame = tk.Frame(filter_frame, bg="#16213e")
+        date_filter_frame.pack(fill="x", pady=5)
+        
+        tk.Label(
+            date_filter_frame,
+            text="Дата:",
+            font=("Segoe UI", 10),
+            bg="#16213e",
+            fg="#cccccc"
+        ).pack(side="left", padx=(5, 10))
+        
+        self.filter_date = tk.Entry(
+            date_filter_frame,
+            font=("Segoe UI", 10),
+            bg="#0f3460",
+            fg="#ffffff",
+            relief="flat",
+            width=15
+        )
+        self.filter_date.pack(side="left", padx=(0, 20))
+        
+        # Фильтр по температуре
+        temp_filter_frame = tk.Frame(filter_frame, bg="#16213e")
+        temp_filter_frame.pack(fill="x", pady=5)
+        
+        tk.Label(
+            temp_filter_frame,
+            text="Температура:",
+            font=("Segoe UI", 10),
+            bg="#16213e",
+            fg="#cccccc"
+        ).pack(side="left", padx=(5, 10))
+        
+        self.filter_temp_min = tk.Entry(
+            temp_filter_frame,
+            font=("Segoe UI", 10),
+            bg="#0f3460",
+            fg="#ffffff",
+            relief="flat",
+            width=8
+        )
+        self.filter_temp_min.pack(side="left", padx=(0, 5))
+        
+        tk.Label(
+            temp_filter_frame,
+            text="до",
+            font=("Segoe UI", 10),
+            bg="#16213e",
+            fg="#cccccc"
+        ).pack(side="left", padx=5)
+        
+        self.filter_temp_max = tk.Entry(
+            temp_filter_frame,
+            font=("Segoe UI", 10),
+            bg="#0f3460",
+            fg="#ffffff",
+            relief="flat",
+            width=8
+        )
+        self.filter_temp_max.pack(side="left", padx=(5, 20))
+        
+        # Кнопки фильтрации
+        filter_buttons = tk.Frame(filter_frame, bg="#16213e")
+        filter_buttons.pack(fill="x", pady=10)
+        
+        self.apply_filter_button = tk.Button(
+            filter_buttons,
+            text="Применить фильтр",
+            command=self.apply_filter,
+            bg="#e94560",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            relief="flat",
+            cursor="hand2"
+        )
+        self.apply_filter_button.pack(side="left", padx=5, expand=True, fill="x")
+        
+        self.reset_filter_button = tk.Button(
+            filter_buttons,
+            text="Сбросить фильтр",
+            command=self.reset_filter,
+            bg="#3498db",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            relief="flat",
+            cursor="hand2"
+        )
+        self.reset_filter_button.pack(side="left", padx=5, expand=True, fill="x")
+        
+        # Таблица записей
+        table_frame = tk.Frame(right_frame, bg="#1a1a2e")
+        table_frame.pack(fill="both", expand=True)
+        
+        tk.Label(
+            table_frame,
+            text="📋 ВСЕ ЗАПИСИ",
+            font=("Segoe UI", 12, "bold"),
+            bg="#1a1a2e",
+            fg="#ffffff"
+        ).pack(anchor="w", pady=(0, 8))
+        
+        # Treeview для таблицы
+        columns = ("date", "temperature", "description", "precipitation")
+        self.weather_tree = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings",
+            height=18
+        )
+        
+        self.weather_tree.heading("date", text="Дата")
+        self.weather_tree.heading("temperature", text="Температура (°C)")
+        self.weather_tree.heading("description", text="Описание")
+        self.weather_tree.heading("precipitation", text="Осадки")
+        
+        self.weather_tree.column("date", width=100, anchor="center")
+        self.weather_tree.column("temperature", width=100, anchor="center")
+        self.weather_tree.column("description", width=280)
+        self.weather_tree.column("precipitation", width=80, anchor="center")
+        
+        # Скроллбар
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.weather_tree.yview)
+        self.weather_tree.configure(yscrollcommand=scrollbar.set)
+        
+        self.weather_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Кнопка удаления
+        delete_frame = tk.Frame(right_frame, bg="#1a1a2e")
+        delete_frame.pack(fill="x", pady=(10, 0))
+        
+        self.delete_button = tk.Button(
+            delete_frame,
+            text="🗑️ Удалить выбранную запись",
+            command=self.delete_record,
+            bg="#dc3545",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            relief="flat",
+            cursor="hand2"
+        )
+        self.delete_button.pack()
+        
+        # Статусная строка
+        self.status_label = tk.Label(
+            self.window,
+            text="💡 Готов к работе",
+            font=("Segoe UI", 9),
+            bg="#1a1a2e",
+            fg="#888888",
+            anchor="w"
+        )
+        self.status_label.pack(side="bottom", fill="x", padx=20, pady=(0, 10))
+        
+        # Привязка клавиши Enter
+        self.date_entry.bind("<Return>", lambda event: self.add_record())
+        self.temp_entry.bind("<Return>", lambda event: self.add_record())
+        
+        # Обновление статистики
+        self.update_statistics()
+    
+    def validate_date(self, date_string):
+        """Проверяет корректность даты"""
+        pattern = r'^\d{4}-\d{2}-\d{2}$'
+        if not re.match(pattern, date_string):
+            return False
+        try:
+            datetime.strptime(date_string, "%Y-%m-%d")
+            return True
+        except ValueError:
+            return False
+    
+    def add_record(self):
+        """Добавляет новую запись о погоде"""
+        # Получение данных
+        date = self.date_entry.get().strip()
+        temp_str = self.temp_entry.get().strip()
+        description = self.desc_entry.get().strip()
+        precipitation = self.precipitation_var.get()
+        
+        # Валидация даты
+        if not self.validate_date(date):
+            messagebox.showwarning("Ошибка", "Неверный формат даты!\nИспользуйте ГГГГ-ММ-ДД (например, 2024-01-15)")
+            return
+        
+        # Валидация температуры
+        if not temp_str:
+            messagebox.showwarning("Ошибка", "Введите температуру!")
+            return
+        
+        try:
+            temperature = float(temp_str)
+        except ValueError:
+            messagebox.showwarning("Ошибка", f"'{temp_str}' — это не число!\nВведите числовое значение температуры.")
+            self.temp_entry.delete(0, tk.END)
+            return
+        
+        # Валидация описания
+        if not description:
+            messagebox.showwarning("Ошибка", "Введите описание погоды!")
+            return
+        
+        # Добавление записи
+        record = {
+            "date": date,
+            "temperature": temperature,
+            "description": description,
+            "precipitation": precipitation
+        }
+        
+        self.records.append(record)
+        # Сортируем по дате (новые сверху)
+        self.records.sort(key=lambda x: x["date"], reverse=True)
+        self.save_records()
+        self.update_table()
+        self.update_statistics()
+        
+        # Очистка полей
+        self.temp_entry.delete(0, tk.END)
+        self.desc_entry.delete(0, tk.END)
+        self.precipitation_var.set(False)
+        
+        self.status_label.config(text=f"✅ Запись добавлена: {date}, {temperature}°C", fg="#4ecdc4")
+        self.window.after(3000, lambda: self.status_label.config(text="💡 Готов к работе", fg="#888888"))
+    
+    def delete_record(self):
+        """Удаляет выбранную запись"""
+        selected = self.weather_tree.selection()
+        if not selected:
+            messagebox.showwarning("Ошибка", "Выберите запись для удаления!")
+            return
+        
+        item = selected[0]
+        values = self.weather_tree.item(item, "values")
+        date = values[0]
+        temp = values[1]
+        
+        if messagebox.askyesno("Подтверждение", f"Удалить запись:\n📅 {date} | 🌡️ {temp}°C"):
+            # Находим и удаляем запись
+            for i, record in enumerate(self.records):
+                if record["date"] == date and record["temperature"] == float(temp):
+                    self.records.pop(i)
+                    break
+            
+            self.save_records()
+            self.update_table()
+            self.update_statistics()
+            self.apply_filter()  # Переприменяем фильтр
+            self.status_label.config(text=f"🗑️ Запись удалена", fg="#ff6b6b")
+            self.window.after(3000, lambda: self.status_label.config(text="💡 Готов к работе", fg="#888888"))
+    
+    def apply_filter(self):
+        """Применяет фильтрацию записей"""
+        filter_date = self.filter_date.get().strip()
+        filter_temp_min = self.filter_temp_min.get().strip()
+        filter_temp_max = self.filter_temp_max.get().strip()
+        
+        filtered = self.records.copy()
+        
+        # Фильтр по дате
+        if filter_date:
+            if self.validate_date(filter_date):
+                filtered = [r for r in filtered if r["date"] == filter_date]
+            else:
+                messagebox.showwarning("Ошибка", "Неверный формат даты в фильтре!\nИспользуйте ГГГГ-ММ-ДД")
+                return
+        
+        # Фильтр по температуре
+        if filter_temp_min:
+            try:
+                temp_min = float(filter_temp_min)
+                filtered = [r for r in filtered if r["temperature"] >= temp_min]
+            except ValueError:
+                messagebox.showwarning("Ошибка", "Неверное значение минимальной температуры!")
+                return
+        
+        if filter_temp_max:
+            try:
+                temp_max = float(filter_temp_max)
+                filtered = [r for r in filtered if r["temperature"] <= temp_max]
+            except ValueError:
+                messagebox.showwarning("Ошибка", "Неверное значение максимальной температуры!")
+                return
+        
+        # Обновление таблицы
+        self.update_table(filtered)
+        
+        # Статус
+        self.status_label.config(text=f"🔍 Найдено {len(filtered)} записей", fg="#f39c12")
+        self.window.after(3000, lambda: self.status_label.config(text="💡 Готов к работе", fg="#888888"))
+    
+    def reset_filter(self):
+        """Сбрасывает фильтр"""
+        self.filter_date.delete(0, tk.END)
+        self.filter_temp_min.delete(0, tk.END)
+        self.filter_temp_max.delete(0, tk.END)
+        
+        self.update_table()
+        self.status_label.config(text="🔄 Фильтр сброшен", fg="#4ecdc4")
+        self.window.after(3000, lambda: self.status_label.config(text="💡 Готов к работе", fg="#888888"))
+    
+    def update_table(self, records_list=None):
+        """Обновляет таблицу записей"""
+        # Очищаем таблицу
+        for item in self.weather_tree.get_children():
+            self.weather_tree.delete(item)
+        
+        if records_list is None:
+            records_list = self.records
+        
+        # Добавляем записи
+        for record in records_list:
+            precipitation_text = "✅ Да" if record["precipitation"] else "❌ Нет"
+            self.weather_tree.insert("", "end", values=(
+                record["date"],
+                f"{record['temperature']:.1f}",
+                record["description"],
+                precipitation_text
+            ))
+    
+    def update_statistics(self):
+        """Обновляет статистику"""
+        if not self.records:
+            self.total_label.config(text="Всего записей: 0")
+            self.avg_temp_label.config(text="Средняя температура: 0°C")
+            self.max_temp_label.config(text="Максимальная температура: 0°C")
+            self.min_temp_label.config(text="Минимальная температура: 0°C")
+            return
+        
+        total = len(self.records)
+        temps = [r["temperature"] for r in self.records]
+        avg_temp = sum(temps) / len(temps)
+        max_temp = max(temps)
+        min_temp = min(temps)
+        
+        self.total_label.config(text=f"Всего записей: {total}")
+        self.avg_temp_label.config(text=f"Средняя температура: {avg_temp:.1f}°C")
+        self.max_temp_label.config(text=f"Максимальная температура: {max_temp:.1f}°C")
+        self.min_temp_label.config(text=f"Минимальная температура: {min_temp:.1f}°C")
+    
+    def on_closing(self):
+        """Обработка закрытия окна"""
+        if self.save_records():
+            self.window.destroy()
+    
+    def run(self):
+        """Запуск приложения"""
+        self.window.mainloop()
+
+# Запуск программы
+if __name__ == "__main__":
+    app = WeatherDiary()
+    app.run()
